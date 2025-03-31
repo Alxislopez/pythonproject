@@ -100,7 +100,7 @@ function App() {
     setFile(e.target.files[0]);
   };
   
-  const handleDownloadPdf = async () => {
+  const handleDirectPdfDownload = async () => {
     if (!text.trim() && !results) {
       setError('Please process some text before downloading PDF');
       return;
@@ -110,29 +110,109 @@ function App() {
     setError('');
     
     try {
-      const response = await axios.post(`${API_URL}/download-pdf`, {
-        text: text,
+      // Use a direct download approach
+      const response = await axios.post(`${API_URL}/direct-pdf-download`, {
+        text: text || "Sample text",
         feature_type: featureType,
         ngram_size: ngramSize,
         base,
         summarize,
         summary_ratio: summaryRatio
       }, {
-        responseType: 'blob'
+        responseType: 'blob'  // Important to handle binary data
       });
       
-      // Create a download link and trigger it
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      // Create object URL from the blob response
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Extract filename from Content-Disposition header if available
+      let filename = 'report.pdf';
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      // Create download link and trigger it
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'nlp_processing_results.pdf');
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
     } catch (err) {
-      setError(`Error generating PDF: ${err.message}`);
+      console.error('PDF direct download error:', err);
+      setError(`Error downloading PDF: ${err.message}`);
     } finally {
       setDownloadingPdf(false);
+    }
+  };
+
+  const handleDirectExcelDownload = async () => {
+    if (!text.trim() && !results) {
+      setError('Please process some text before downloading Excel');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Use a direct download approach
+      const response = await axios.post(`${API_URL}/direct-excel-download`, {
+        text: text || "Sample text",
+        feature_type: featureType,
+        ngram_size: ngramSize,
+        base,
+        summarize,
+        summary_ratio: summaryRatio
+      }, {
+        responseType: 'blob'  // Important to handle binary data
+      });
+      
+      // Create object URL from the blob response
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Extract filename from Content-Disposition header if available
+      let filename = 'report.xlsx';
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]*)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      // Create download link and trigger it
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+    } catch (err) {
+      console.error('Excel direct download error:', err);
+      setError(`Error downloading Excel: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -294,15 +374,26 @@ function App() {
           <Paper elevation={3} sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h5">Results</Typography>
-              <Button 
-                variant="contained" 
-                color="primary"
-                onClick={handleDownloadPdf}
-                disabled={downloadingPdf}
-                startIcon={downloadingPdf ? <CircularProgress size={20} /> : null}
-              >
-                Download as PDF
-              </Button>
+              <Box>
+                <Button 
+                  variant="contained" 
+                  color="primary"
+                  onClick={handleDirectPdfDownload}
+                  disabled={downloadingPdf}
+                  startIcon={downloadingPdf ? <CircularProgress size={20} /> : null}
+                  sx={{ mr: 1 }}
+                >
+                  Download as PDF
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="success"
+                  onClick={handleDirectExcelDownload}
+                  disabled={loading}
+                >
+                  Download as Excel
+                </Button>
+              </Box>
             </Box>
             
             <Box sx={{ mb: 2 }}>
@@ -314,14 +405,14 @@ function App() {
             {results.summary && (
               <>
                 <Divider sx={{ my: 2 }} />
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h5" gutterBottom color="primary">
                   Text Summary:
                 </Typography>
                 <Paper 
                   variant="outlined" 
-                  sx={{ p: 2, mb: 3, bgcolor: '#f5f5f5' }}
+                  sx={{ p: 3, mb: 3, bgcolor: '#f8f8f8', borderColor: 'primary.light' }}
                 >
-                  <Typography>{results.summary}</Typography>
+                  <Typography variant="body1">{results.summary}</Typography>
                 </Paper>
               </>
             )}

@@ -9,9 +9,13 @@ import uvicorn
 import os
 from text_utils import preprocess_text, extract_features, summarize_text
 from radix_sort import radix_sort_numeric, radix_sort_strings
-from file_processor import extract_text_from_pdf, extract_text_from_excel, generate_pdf_report
+from file_processor import extract_text_from_pdf, extract_text_from_excel, generate_pdf_report, generate_excel_report
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="NLP Text Processing API")
+
+# Serve static files (for PDF downloads)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Configure CORS to allow requests from the React frontend
 app.add_middleware(
@@ -147,10 +151,10 @@ async def download_results_as_pdf(request: ProcessTextRequest):
         
         # Generate PDF
         pdf_content = generate_pdf_report(
-            response.sorted_features,
-            response.processing_time,
-            response.feature_count,
-            response.summary
+            response["sorted_features"],
+            response["processing_time"],
+            response["feature_count"],
+            response.get("summary")
         )
         
         # Return PDF file
@@ -163,12 +167,327 @@ async def download_results_as_pdf(request: ProcessTextRequest):
         )
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"PDF generation error: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        raise HTTPException(
+            status_code=500, 
+            detail=f"PDF generation error: {str(e)}\n\nDetails: {error_details}"
+        )
+
+@app.post("/api/create-pdf-file")
+async def create_pdf_file(request: ProcessTextRequest):
+    """Process text and save a PDF file on the server."""
+    try:
+        print(f"PDF file creation requested with feature type: {request.feature_type}")
+        
+        # Process the text first
+        response = await process_text(request)
+        
+        # Generate a unique filename
+        import uuid
+        import os
+        filename = f"report_{uuid.uuid4().hex[:8]}.pdf"
+        filepath = os.path.join("static", filename)
+        
+        # Make sure the directory exists with proper permissions
+        if not os.path.exists("static"):
+            print("Creating static directory")
+            os.makedirs("static", exist_ok=True, mode=0o777)
+        
+        print(f"Generating PDF file at: {filepath}")
+        
+        # Generate PDF content
+        pdf_content = generate_pdf_report(
+            response["sorted_features"],
+            response["processing_time"],
+            response["feature_count"],
+            response.get("summary")
+        )
+        
+        print(f"PDF content generated, size: {len(pdf_content)} bytes")
+        
+        # Save the PDF file
+        with open(filepath, "wb") as f:
+            f.write(pdf_content)
+            
+        print(f"PDF file saved successfully: {filepath}")
+        
+        # Return the file path for downloading
+        download_url = f"/static/{filename}"
+        print(f"Download URL: {download_url}")
+        return {"download_url": download_url, "filename": filename}
+    
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"PDF file creation error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"PDF generation error: {str(e)}\n\nDetails: {error_details}"
+        )
+
+@app.post("/api/create-excel-file")
+async def create_excel_file(request: ProcessTextRequest):
+    """Process text and save an Excel file on the server."""
+    try:
+        # Process the text first
+        response = await process_text(request)
+        
+        # Generate a unique filename
+        import uuid
+        import os
+        filename = f"report_{uuid.uuid4().hex[:8]}.xlsx"
+        filepath = os.path.join("static", filename)
+        
+        # Make sure the directory exists
+        os.makedirs("static", exist_ok=True)
+        
+        # Import the Excel generator
+        from file_processor import generate_excel_report
+        
+        # Generate Excel content
+        excel_content = generate_excel_report(
+            response["sorted_features"],
+            response["processing_time"],
+            response["feature_count"],
+            response.get("summary")
+        )
+        
+        # Save the Excel file
+        with open(filepath, "wb") as f:
+            f.write(excel_content)
+        
+        # Return the file path for downloading
+        download_url = f"/static/{filename}"
+        return {"download_url": download_url, "filename": filename}
+    
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Excel file creation error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Excel generation error: {str(e)}\n\nDetails: {error_details}"
+        )
 
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok"}
+
+@app.get("/test")
+async def simple_test():
+    """A simple test endpoint."""
+    return {"message": "API is working"}
+
+@app.get("/api/test-pdf")
+async def test_pdf():
+    """Generate a simple test PDF to verify PDF generation works."""
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph
+        from reportlab.lib.styles import getSampleStyleSheet
+        import io
+        
+        # Create a simple PDF
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = [
+            Paragraph("Test PDF Document", styles["Heading1"]),
+            Paragraph("If you can see this, PDF generation is working.", styles["Normal"])
+        ]
+        doc.build(story)
+        buffer.seek(0)
+        
+        # Return the PDF
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=test.pdf"
+            }
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"PDF generation error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"PDF generation error: {str(e)}\n\nDetails: {error_details}"
+        )
+
+@app.get("/api/simple-pdf")
+async def simple_pdf_download():
+    """Generate a simple PDF without any text processing."""
+    try:
+        # Generate a simple PDF with sample data
+        sample_features = ["apple", "banana", "cherry", "date", "elderberry"]
+        pdf_content = generate_pdf_report(
+            sorted_features=sample_features,
+            processing_time=0.1234,
+            feature_count=len(sample_features),
+            summary="This is a sample summary text to test PDF generation functionality."
+        )
+        
+        # Return PDF file
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=sample_report.pdf"
+            }
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Simple PDF error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"PDF generation error: {str(e)}\n\nDetails: {error_details}"
+        )
+
+@app.get("/api/super-simple-pdf")
+async def super_simple_pdf():
+    """Generate the simplest possible PDF."""
+    try:
+        from reportlab.pdfgen import canvas
+        import io
+        
+        # Create a buffer
+        buffer = io.BytesIO()
+        
+        # Create a canvas
+        c = canvas.Canvas(buffer)
+        
+        # Add text
+        c.drawString(100, 750, "Super Simple PDF Test")
+        c.drawString(100, 730, "If you can see this, PDF generation works at its most basic level.")
+        
+        # Save the PDF
+        c.save()
+        
+        # Get the PDF content
+        buffer.seek(0)
+        
+        # Return the PDF
+        return Response(
+            content=buffer.getvalue(),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "attachment; filename=super_simple.pdf"
+            }
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Super simple PDF error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"PDF generation error: {str(e)}\n\nDetails: {error_details}"
+        )
+
+@app.get("/api/files/{filename}")
+async def get_file(filename: str):
+    """Serve a generated file directly."""
+    import os
+    filepath = os.path.join("static", filename)
+    
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+    
+    # Determine content type based on file extension
+    content_type = "application/octet-stream"  # Default
+    if filename.endswith(".pdf"):
+        content_type = "application/pdf"
+    elif filename.endswith(".xlsx"):
+        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    
+    # Read the file
+    with open(filepath, "rb") as f:
+        content = f.read()
+    
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+@app.post("/api/direct-pdf-download")
+async def direct_pdf_download(request: ProcessTextRequest):
+    """Process text and return PDF directly in response."""
+    try:
+        # Process the text
+        response = await process_text(request)
+        
+        # Generate PDF content
+        pdf_content = generate_pdf_report(
+            response["sorted_features"],
+            response["processing_time"],
+            response["feature_count"],
+            response.get("summary")
+        )
+        
+        # Generate a filename
+        import uuid
+        filename = f"report_{uuid.uuid4().hex[:8]}.pdf"
+        
+        # Return the PDF directly in the response
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Direct PDF download error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"PDF generation error: {str(e)}\n\nDetails: {error_details}"
+        )
+
+@app.post("/api/direct-excel-download")
+async def direct_excel_download(request: ProcessTextRequest):
+    """Process text and return Excel directly in response."""
+    try:
+        # Process the text
+        response = await process_text(request)
+        
+        # Generate Excel content
+        excel_content = generate_excel_report(
+            response["sorted_features"],
+            response["processing_time"],
+            response["feature_count"],
+            response.get("summary")
+        )
+        
+        # Generate a filename
+        import uuid
+        filename = f"report_{uuid.uuid4().hex[:8]}.xlsx"
+        
+        # Return the Excel directly in the response
+        return Response(
+            content=excel_content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Direct Excel download error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Excel generation error: {str(e)}\n\nDetails: {error_details}"
+        )
 
 if __name__ == "__main__":
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True) 
