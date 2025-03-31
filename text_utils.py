@@ -5,6 +5,15 @@ Text processing utilities for NLP
 import re
 import string
 from collections import Counter
+from summa import summarizer as text_rank_summarizer
+import nltk
+from nltk.tokenize import sent_tokenize
+
+# Download necessary NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 def preprocess_text(text):
     """
@@ -95,4 +104,39 @@ def analyze_features(features):
         'most_common': feature_counts.most_common(10)
     }
     
-    return stats 
+    return stats
+
+def summarize_text(text, ratio=0.2):
+    """
+    Generate a summary of the input text.
+    
+    Args:
+        text: Input text to summarize
+        ratio: Proportion of the original text to keep (0.0 to 1.0)
+        
+    Returns:
+        Summarized text
+    """
+    if not text.strip():
+        return ""
+    
+    # Use TextRank algorithm for summarization
+    try:
+        summary = text_rank_summarizer.summarize(text, ratio=ratio)
+        if not summary.strip():
+            # Fallback to a simple extractive summary if TextRank fails
+            sentences = sent_tokenize(text)
+            if len(sentences) <= 3:
+                return text  # Text is already short enough
+            
+            # Take the first sentence and approximately ratio% of the remaining ones
+            num_sentences = max(2, int(len(sentences) * ratio))
+            summary = " ".join(sentences[:num_sentences])
+        
+        return summary
+    except Exception as e:
+        print(f"Summarization error: {e}")
+        # Simple fallback - just return the first few sentences
+        sentences = sent_tokenize(text)
+        num_sentences = max(1, int(len(sentences) * ratio))
+        return " ".join(sentences[:num_sentences]) 

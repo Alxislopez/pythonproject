@@ -1,5 +1,13 @@
 """
 Radix Sort implementation for text data and numeric data
+
+This module provides the optimized radix sort algorithm used exclusively 
+for all sorting operations in the NLP text processing application.
+
+The implementation includes:
+1. radix_sort_numeric - For sorting numbers with customizable base
+2. radix_sort_strings - For sorting text strings efficiently
+3. Helper functions for counting sort and small array optimization
 """
 
 def insertion_sort(arr):
