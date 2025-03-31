@@ -212,4 +212,46 @@ def generate_excel_report(sorted_features, processing_time, feature_count, summa
         df = pd.DataFrame({'Error': [f"Error generating Excel report: {str(e)}"]})
         df.to_excel(buffer, index=False)
         buffer.seek(0)
-        return buffer.getvalue() 
+        return buffer.getvalue()
+
+def generate_csv_report(sorted_features, processing_time, feature_count, summary=None):
+    """
+    Generate a CSV report with the processing results.
+    
+    Args:
+        sorted_features: List of sorted features
+        processing_time: Time taken to process the text
+        feature_count: Number of features processed
+        summary: Optional summary of the text
+        
+    Returns:
+        CSV file content as string
+    """
+    import csv
+    import io
+    
+    # Create a buffer
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    
+    # Write metadata
+    writer.writerow(["NLP Processing Results"])
+    writer.writerow(["Processing Time (seconds)", f"{processing_time:.4f}"])
+    writer.writerow(["Features Processed", feature_count])
+    writer.writerow(["Sorting Method", "Optimized Radix Sort"])
+    
+    # Add summary if available
+    if summary:
+        writer.writerow([])
+        writer.writerow(["Text Summary"])
+        writer.writerow([summary])
+    
+    # Write header for features
+    writer.writerow([])
+    writer.writerow(["#", "Feature"])
+    
+    # Write sorted features
+    for i, feature in enumerate(sorted_features, 1):
+        writer.writerow([i, feature])
+    
+    return buffer.getvalue() 

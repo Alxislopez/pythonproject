@@ -9,10 +9,15 @@ import uvicorn
 import os
 from text_utils import preprocess_text, extract_features, summarize_text
 from radix_sort import radix_sort_numeric, radix_sort_strings
-from file_processor import extract_text_from_pdf, extract_text_from_excel, generate_pdf_report, generate_excel_report
+from file_processor import extract_text_from_pdf, extract_text_from_excel, generate_pdf_report, generate_excel_report, generate_csv_report
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI(title="NLP Text Processing API")
+app = FastAPI(title="ML Data Convertor API")
+
+# Ensure static directory exists
+if not os.path.exists("static"):
+    os.makedirs("static", exist_ok=True)
+    print(f"Created static directory at: {os.path.abspath('static')}")
 
 # Serve static files (for PDF downloads)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -20,7 +25,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Configure CORS to allow requests from the React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify the actual frontend URL
+    allow_origins=["*"],  # For development only
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -272,8 +277,8 @@ async def create_excel_file(request: ProcessTextRequest):
 
 @app.get("/api/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok"}
+    """Basic health check endpoint."""
+    return {"status": "ok", "message": "API is healthy"}
 
 @app.get("/test")
 async def simple_test():
@@ -488,6 +493,167 @@ async def direct_excel_download(request: ProcessTextRequest):
             status_code=500, 
             detail=f"Excel generation error: {str(e)}\n\nDetails: {error_details}"
         )
+
+@app.post("/api/simple-download")
+async def simple_download(request: ProcessTextRequest):
+    """A very simple file download endpoint for testing."""
+    try:
+        # Generate a simple text file
+        content = f"""NLP Processing Results
+        
+Time: {time.time()}
+Text: {request.text[:100] + '...' if len(request.text) > 100 else request.text}
+Feature Type: {request.feature_type}
+        
+This is a test file to verify downloads are working.
+"""
+        # Return as text file
+        return Response(
+            content=content,
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": "attachment; filename=test_download.txt"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Download error: {str(e)}")
+
+@app.get("/api/test-endpoint")
+async def test_endpoint():
+    """Simple test endpoint to verify API is accessible."""
+    return {"status": "ok", "message": "API is working", "time": time.time()}
+
+@app.post("/api/csv")
+async def csv_download(request: ProcessTextRequest):
+    """Generate a simple CSV file for download."""
+    try:
+        # Process the text
+        response = await process_text(request)
+        
+        # Generate CSV content as byte string (not StringIO)
+        import csv
+        import io
+        
+        # Use BytesIO instead of StringIO to handle binary response
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        
+        # Write header
+        writer.writerow(["Rank", "Feature"])
+        
+        # Write data
+        for i, feature in enumerate(response["sorted_features"], 1):
+            writer.writerow([i, feature])
+        
+        # Convert to string
+        csv_content = buffer.getvalue()
+        
+        # Return as CSV
+        return Response(
+            content=csv_content,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=features.csv"
+            }
+        )
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Simple CSV error: {str(e)}\n{error_details}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"CSV generation error: {str(e)}\n\nDetails: {error_details}"
+        )
+
+@app.post("/api/text")
+async def text_download(request: ProcessTextRequest):
+    """Generate a simple text file with the sorted features."""
+    try:
+        # Process the text
+        response = await process_text(request)
+        
+        # Generate plain text content
+        text_content = "NLP Text Processing Results\n\n"
+        text_content += f"Processing Time: {response['processing_time']:.4f} seconds\n"
+        text_content += f"Features Processed: {response['feature_count']}\n"
+        text_content += f"Sorting Method: Optimized Radix Sort\n\n"
+        
+        if response.get("summary"):
+            text_content += "Text Summary:\n"
+            text_content += response["summary"] + "\n\n"
+        
+        text_content += "Sorted Features:\n"
+        for i, feature in enumerate(response["sorted_features"], 1):
+            text_content += f"{i}. {feature}\n"
+        
+        # Return as plain text
+        return Response(
+            content=text_content,
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": "attachment; filename=features.txt"
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Text generation error: {str(e)}")
+
+@app.post("/api/raw-csv")
+async def raw_csv(request: ProcessTextRequest):
+    """Process text and return raw CSV content."""
+    try:
+        # Process the text
+        response = await process_text(request)
+        
+        # Generate CSV content
+        import csv
+        import io
+        
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        
+        # Write header
+        writer.writerow(["Rank", "Feature"])
+        
+        # Write data
+        for i, feature in enumerate(response["sorted_features"], 1):
+            writer.writerow([i, feature])
+        
+        # Return raw CSV as text
+        csv_content = buffer.getvalue()
+        
+        return {"content": csv_content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"CSV generation error: {str(e)}")
+
+@app.post("/api/raw-text")
+async def raw_text(request: ProcessTextRequest):
+    """Process text and return plain text results."""
+    try:
+        # Process the text
+        response = await process_text(request)
+        
+        # Generate text content
+        text_content = "NLP Text Processing Results\n\n"
+        text_content += f"Processing Time: {response['processing_time']:.4f} seconds\n"
+        text_content += f"Features Processed: {response['feature_count']}\n"
+        text_content += f"Sorting Method: Optimized Radix Sort\n\n"
+        
+        if response.get("summary"):
+            text_content += "Text Summary:\n"
+            text_content += response["summary"] + "\n\n"
+        
+        text_content += "Sorted Features:\n"
+        for i, feature in enumerate(response["sorted_features"], 1):
+            text_content += f"{i}. {feature}\n"
+        
+        return {"content": text_content}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Text generation error: {str(e)}")
+
+@app.get("/api/text-test")
+async def text_test():
+    """Simple endpoint to test text response."""
+    return {"content": "This is a test response from the API server."}
 
 if __name__ == "__main__":
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True) 
