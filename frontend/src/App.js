@@ -21,8 +21,10 @@ import {
   Slider
 } from '@mui/material';
 import './App.css';
+import CheckIcon from '@mui/icons-material/Check';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = '';
 
 function App() {
   const [text, setText] = useState('');
@@ -58,6 +60,9 @@ function App() {
         summarize,
         summary_ratio: summaryRatio
       });
+      
+      console.log("API Response:", response.data);
+      console.log("Summary present:", Boolean(response.data.summary));
       
       setResults(response.data);
     } catch (err) {
@@ -525,7 +530,11 @@ function App() {
                   color="primary"
                 />
               }
-              label="Generate Text Summary"
+              label={
+                <Typography sx={{ fontWeight: summarize ? 'bold' : 'normal', color: summarize ? 'primary.main' : 'inherit' }}>
+                  Generate Text Summary
+                </Typography>
+              }
             />
             
             {summarize && (
@@ -700,8 +709,9 @@ function App() {
                   variant="contained" 
                   color={successCopy ? "success" : "primary"}
                   onClick={handleCopyContent}
+                  startIcon={successCopy ? <CheckIcon /> : <ContentCopyIcon />}
                 >
-                  {successCopy ? "✓ Copied!" : "Copy to Clipboard"}
+                  {successCopy ? "Copied!" : "Copy to Clipboard"}
                 </Button>
               </Box>
               <TextField
