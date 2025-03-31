@@ -108,51 +108,35 @@ def analyze_features(features):
 
 def summarize_text(text, ratio=0.2):
     """
-    Create a simple summary by taking the most important sentences.
-    This is a basic extractive summarization.
+    Generate a summary of the input text.
     
     Args:
-        text: The text to summarize
-        ratio: Proportion of original text to keep (0.0-1.0)
-    
+        text: Input text to summarize
+        ratio: Proportion of the original text to keep (0.0 to 1.0)
+        
     Returns:
-        A summary of the text
+        Summarized text
     """
-    import re
-    from collections import Counter
+    if not text.strip():
+        return ""
     
-    if not text or ratio >= 1.0:
-        return text
-    
-    # Split into sentences
-    sentences = re.split(r'(?<=[.!?])\s+', text)
-    
-    if len(sentences) <= 3:
-        return text  # Text is already short enough
-    
-    # Count word frequency
-    words = re.findall(r'\w+', text.lower())
-    word_freq = Counter(words)
-    
-    # Score each sentence
-    sentence_scores = []
-    for sentence in sentences:
-        score = 0
-        for word in re.findall(r'\w+', sentence.lower()):
-            score += word_freq[word]
-        sentence_scores.append((score, sentence))
-    
-    # Sort by score and select top sentences
-    sorted_sentences = sorted(sentence_scores, key=lambda x: x[0], reverse=True)
-    num_sentences = max(1, int(len(sentences) * ratio))
-    top_sentences = sorted_sentences[:num_sentences]
-    
-    # Reorder sentences to maintain original flow
-    original_order = []
-    for _, sentence in top_sentences:
-        original_order.append((sentences.index(sentence), sentence))
-    
-    original_order.sort()  # Sort by position in original text
-    summary = ' '.join([sentence for _, sentence in original_order])
-    
-    return summary 
+    # Use TextRank algorithm for summarization
+    try:
+        summary = text_rank_summarizer.summarize(text, ratio=ratio)
+        if not summary.strip():
+            # Fallback to a simple extractive summary if TextRank fails
+            sentences = sent_tokenize(text)
+            if len(sentences) <= 3:
+                return text  # Text is already short enough
+            
+            # Take the first sentence and approximately ratio% of the remaining ones
+            num_sentences = max(2, int(len(sentences) * ratio))
+            summary = " ".join(sentences[:num_sentences])
+        
+        return summary
+    except Exception as e:
+        print(f"Summarization error: {e}")
+        # Simple fallback - just return the first few sentences
+        sentences = sent_tokenize(text)
+        num_sentences = max(1, int(len(sentences) * ratio))
+        return " ".join(sentences[:num_sentences]) 
