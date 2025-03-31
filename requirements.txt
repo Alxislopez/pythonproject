@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pandas
+nltk
+scikit-learn
+summa
+openpyxl
