@@ -1,0 +1,7 @@
+Summary:
+RAG- Retrieval augmented generation explained
+combines ir with generative ai
+rag use uses
+
+Keywords:
+rag, information, ir, retrieval, queries, search, uses, generative, trained, typing
