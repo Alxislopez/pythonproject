@@ -28,35 +28,43 @@ def preprocess_text(text):
     
     return text
 
+import re  # Ensure regex is imported
+
 def extract_features(text, feature_type='words', n=2):
     """
     Extract features from text.
-    
+
     Args:
         text: Preprocessed text
-        feature_type: Type of features to extract ('words', 'sentences', or 'ngrams')
+        feature_type: Type of features to extract ('words', 'sentences', 'numbers', or 'ngrams')
         n: Size of n-grams if feature_type is 'ngrams'
-        
+
     Returns:
         List of extracted features
     """
+    features = []  # Ensure features is always initialized
+
     if feature_type == 'words':
         # Split text into words
         features = text.split()
-        
+
     elif feature_type == 'sentences':
         # Split text into sentences
-        # This is a simple implementation; more sophisticated sentence tokenization might be needed
         features = re.split(r'[.!?]+', text)
         features = [s.strip() for s in features if s.strip()]
-        
+
+    elif feature_type == 'numbers':
+        # Extract numbers using regex
+        features = re.findall(r'\d+', text)  # Finds all numeric sequences
+
     elif feature_type == 'ngrams':
         # Generate n-grams
         words = text.split()
-        features = []
-        for i in range(len(words) - n + 1):
-            features.append(' '.join(words[i:i+n]))
-    
+        features = [' '.join(words[i:i+n]) for i in range(len(words) - n + 1)]
+
+    else:
+        raise ValueError(f"Unknown feature_type: {feature_type}")
+
     # Remove duplicates while preserving order
     unique_features = []
     seen = set()
@@ -64,7 +72,7 @@ def extract_features(text, feature_type='words', n=2):
         if feature not in seen:
             seen.add(feature)
             unique_features.append(feature)
-    
+
     return unique_features
 
 def analyze_features(features):
