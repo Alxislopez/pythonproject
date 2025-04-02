@@ -11,6 +11,7 @@ from text_utils import preprocess_text, extract_features, summarize_text
 from radix_sort import radix_sort_numeric, radix_sort_strings
 from file_processor import extract_text_from_pdf, extract_text_from_excel, generate_pdf_report, generate_excel_report, generate_csv_report
 from fastapi.staticfiles import StaticFiles
+import nltk
 
 app = FastAPI(title="ML Data Convertor API")
 
@@ -45,6 +46,28 @@ class ProcessResponse(BaseModel):
     processing_time: float
     feature_count: int
     summary: Optional[str] = None
+
+# Add this near the top of your api.py file, before any text processing is done
+try:
+    # Try to find the punkt tokenizer
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    # If not found, download it
+    print("Downloading required NLTK data...")
+    nltk.download('punkt')
+
+# Add this near the top of your api.py file, after the existing NLTK download code
+try:
+    # Try to find the punkt_tab tokenizer
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    # If not found, download it
+    print("Downloading required NLTK punkt_tab data...")
+    try:
+        nltk.download('punkt_tab')
+    except:
+        # Some systems don't have punkt_tab as a separate download
+        print("Could not download punkt_tab directly, will try to fix in code")
 
 def extract_numbers_from_text(text):
     """Extract all numbers from text."""

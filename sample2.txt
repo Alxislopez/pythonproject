@@ -1,5 +1,0 @@
-The quick brown fox jumps over the lazy dog.
-Python is a powerful programming language.
-Machine learning and artificial intelligence are evolving rapidly.
-Sorting algorithms like radix sort help in efficient data processing.
-Data structures and algorithms form the foundation of computer science.
