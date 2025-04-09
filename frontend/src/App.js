@@ -26,7 +26,7 @@ const API_URL = 'http://localhost:8000';
 
 function App() {
   const [text, setText] = useState('');
-  const [file, setFile] = useState(null);
+    const [file, setFile] = useState(null);
   const [featureType, setFeatureType] = useState('numbers');
   const [ngramSize, setNgramSize] = useState(2);
   const [base, setBase] = useState(10);
@@ -67,15 +67,15 @@ function App() {
   };
 
   const handleFileSubmit = async () => {
-    if (!file) {
+        if (!file) {
       setError('Please select a file to upload');
-      return;
-    }
+            return;
+        }
 
     setLoading(true);
     setError('');
 
-    const formData = new FormData();
+        const formData = new FormData();
     formData.append('file', file);
     formData.append('feature_type', featureType);
     formData.append('ngram_size', ngramSize);
@@ -194,12 +194,12 @@ function App() {
     } catch (err) {
       console.error('API test error:', err);
       setError(`API test failed: ${err.message}`);
-    } finally {
+        } finally {
       setLoading(false);
-    }
-  };
+        }
+    };
 
-  return (
+    return (
     <Container maxWidth="md">
       <Box sx={{ my: 4 }}>
         <Typography variant="h3" component="h1" gutterBottom align="center" color="primary">
@@ -320,11 +320,11 @@ function App() {
             Upload File
           </Typography>
           <Box sx={{ mb: 2 }}>
-            <input
+                <input
               accept=".txt,.csv,.json,.pdf,.xlsx,.xls"
               id="file-upload"
-              type="file"
-              onChange={handleFileChange}
+                    type="file"
+                    onChange={handleFileChange}
               style={{ display: 'none' }}
             />
             <label htmlFor="file-upload">
